@@ -1,9 +1,13 @@
 package com.example.hayway;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageButton;
+import android.widget.PopupMenu;
 import android.widget.TextView;
 
 import androidx.activity.EdgeToEdge;
@@ -44,37 +48,89 @@ public class ProfileActivity extends AppCompatActivity {
                 passUserData();
             }
         });
+        ImageButton menuButton = findViewById(R.id.menu_button);
+        menuButton.setOnClickListener(v -> {
+            PopupMenu popupMenu = new PopupMenu(ProfileActivity.this, v);
+            popupMenu.getMenuInflater().inflate(R.menu.top_menu, popupMenu.getMenu());
+
+            popupMenu.setOnMenuItemClickListener(item -> {
+                int id = item.getItemId();
+                if (id == R.id.menu_home) {
+                    startActivity(new Intent(getApplicationContext(), MapActivity.class));
+                    return true;
+                } else if (id == R.id.menu_profile) {
+
+                    return true;
+                } else if (id == R.id.menu_telegram) {
+                    Intent telegramIntent = new Intent(Intent.ACTION_VIEW);
+                    telegramIntent.setData(Uri.parse("https://t.me/YourTelegramUsername")); // <-- change to your real link
+                    startActivity(telegramIntent);
+                    return true;
+                }
+                return false;
+            });
+
+            popupMenu.show();
+        });
+
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
     }
-    public void showAllUserData(){
-        Intent intent = getIntent();
-        String nameUser = intent.getStringExtra("name");
-        String emailUser = intent.getStringExtra("email");
-        String usernameUser = intent.getStringExtra("username");
-        String passwordUser = intent.getStringExtra("password");
-        titleName.setText(nameUser);
-        titleUsername.setText(usernameUser);
-        profileName.setText(nameUser);
-        profileEmail.setText(emailUser);
-        profileUsername.setText(usernameUser);
-        profilePassword.setText(passwordUser);
-    }
-    public void passUserData(){
-        String userUsername = profileUsername.getText().toString().trim();
+    public void showAllUserData() {
+        SharedPreferences sharedPreferences = getSharedPreferences("HayWayPrefs", MODE_PRIVATE);
+        String usernameUser = sharedPreferences.getString("username", null);
+
+        if (usernameUser == null) {
+            // handle error, like showing "not logged in"
+            return;
+        }
+
         DatabaseReference reference = FirebaseDatabase.getInstance().getReference("users");
-        Query checkUserDatabase = reference.orderByChild("username").equalTo(userUsername);
-        checkUserDatabase.addListenerForSingleValueEvent(new ValueEventListener() {
+        reference.child(usernameUser).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (snapshot.exists()) {
+                    String nameFromDB = snapshot.child("name").getValue(String.class);
+                    String emailFromDB = snapshot.child("email").getValue(String.class);
+                    String usernameFromDB = snapshot.child("username").getValue(String.class);
+                    String passwordFromDB = snapshot.child("password").getValue(String.class);
+
+                    titleName.setText(nameFromDB);
+                    titleUsername.setText(usernameFromDB);
+                    profileName.setText(nameFromDB);
+                    profileEmail.setText(emailFromDB);
+                    profileUsername.setText(usernameFromDB);
+                    profilePassword.setText(passwordFromDB);
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+            }
+        });
+    }
+
+    public void passUserData(){
+        SharedPreferences sharedPreferences = getSharedPreferences("HayWayPrefs", MODE_PRIVATE);
+        String usernameUser = sharedPreferences.getString("username", null);
+
+        if (usernameUser == null) {
+            return;
+        }
+
+        DatabaseReference reference = FirebaseDatabase.getInstance().getReference("users");
+        reference.child(usernameUser).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 if (snapshot.exists()){
-                    String nameFromDB = snapshot.child(userUsername).child("name").getValue(String.class);
-                    String emailFromDB = snapshot.child(userUsername).child("email").getValue(String.class);
-                    String usernameFromDB = snapshot.child(userUsername).child("username").getValue(String.class);
-                    String passwordFromDB = snapshot.child(userUsername).child("password").getValue(String.class);
+                    String nameFromDB = snapshot.child("name").getValue(String.class);
+                    String emailFromDB = snapshot.child("email").getValue(String.class);
+                    String usernameFromDB = snapshot.child("username").getValue(String.class);
+                    String passwordFromDB = snapshot.child("password").getValue(String.class);
+
                     Intent intent = new Intent(ProfileActivity.this, EditProfileActivity.class);
                     intent.putExtra("name", nameFromDB);
                     intent.putExtra("email", emailFromDB);
@@ -83,9 +139,10 @@ public class ProfileActivity extends AppCompatActivity {
                     startActivity(intent);
                 }
             }
+
             @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-            }
+            public void onCancelled(@NonNull DatabaseError error) {}
         });
     }
+
 }
